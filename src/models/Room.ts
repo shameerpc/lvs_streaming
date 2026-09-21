@@ -50,6 +50,8 @@ const roomSchema = new Schema<IRoom>(
   }
 );
 
+roomSchema.index({ status: 1, createdAt: -1 });
+
 const Room = mongoose.model<IRoom>("Room", roomSchema);
 
 export default Room;

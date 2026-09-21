@@ -24,7 +24,7 @@ export const env = {
 
   jwtSecret: process.env.JWT_SECRET as string,
 
-  livekitUrl: process.env.LIVEKIT_URL || "",
-  livekitApiKey: process.env.LIVEKIT_API_KEY || "",
-  livekitApiSecret: process.env.LIVEKIT_API_SECRET || "",
+ livekitApiKey: process.env.LIVEKIT_API_KEY as string,
+livekitApiSecret: process.env.LIVEKIT_API_SECRET as string,
+livekitUrl: process.env.LIVEKIT_URL as string,
 };

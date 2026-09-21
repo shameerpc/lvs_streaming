@@ -2,7 +2,6 @@ import { Response } from "express";
 import mongoose from "mongoose";
 
 import Room from "../models/Room.js";
-import User from "../models/User.js";
 import { AuthRequest } from "../middleware/auth.middleware.js";
 
 // Create Room
@@ -93,7 +92,7 @@ export const getRoomById = async (
   res: Response
 ) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -133,20 +132,13 @@ export const joinRoom = async (
   res: Response
 ) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({
         success: false,
         message: "Authentication required",
-      });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid room ID",
       });
     }
 
@@ -166,26 +158,31 @@ export const joinRoom = async (
       });
     }
 
-    const alreadyJoined = room.participants.some(
-      (participant) => participant.toString() === userId
+    const updatedRoom = await Room.findOneAndUpdate(
+      {
+        _id: id,
+        status: "active",
+        participants: { $ne: userId },
+      },
+      {
+        $addToSet: { participants: userId },
+      },
+      { new: true }
     );
 
-    if (alreadyJoined) {
+    if (!updatedRoom) {
       return res.status(409).json({
         success: false,
         message: "User already joined this room",
       });
     }
 
-    room.participants.push(
-      new mongoose.Types.ObjectId(userId)
-    );
+    updatedRoom.participantCount =
+      updatedRoom.participants.length;
 
-    room.participantCount = room.participants.length;
+    await updatedRoom.save();
 
-    await room.save();
-
-    const populatedRoom = await room.populate([
+    const populatedRoom = await updatedRoom.populate([
       {
         path: "host",
         select: "name email profileImage",
@@ -217,20 +214,13 @@ export const leaveRoom = async (
   res: Response
 ) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({
         success: false,
         message: "Authentication required",
-      });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid room ID",
       });
     }
 
@@ -243,44 +233,56 @@ export const leaveRoom = async (
       });
     }
 
-    const isParticipant = room.participants.some(
-      (participant) => participant.toString() === userId
+    // Host leaving ends the room.
+    if (room.host.toString() === userId) {
+      const endedRoom = await Room.findOneAndUpdate(
+        { _id: id, host: userId },
+        {
+          $set: {
+            status: "ended",
+            participants: [],
+            participantCount: 0,
+          },
+        },
+        { new: true }
+      );
+
+      if (endedRoom) {
+        return res.status(200).json({
+          success: true,
+          message: "Host left and room ended",
+          data: endedRoom,
+        });
+      }
+    }
+
+    const updatedRoom = await Room.findOneAndUpdate(
+      {
+        _id: id,
+        participants: { $in: [userId] },
+      },
+      {
+        $pull: { participants: userId },
+      },
+      { new: true }
     );
 
-    if (!isParticipant) {
+    if (!updatedRoom) {
       return res.status(400).json({
         success: false,
         message: "User is not a participant",
       });
     }
 
-    // Host leaving ends the room.
-    if (room.host.toString() === userId) {
-      room.status = "ended";
-      room.participants = [];
-      room.participantCount = 0;
+    updatedRoom.participantCount =
+      updatedRoom.participants.length;
 
-      await room.save();
-
-      return res.status(200).json({
-        success: true,
-        message: "Host left and room ended",
-        data: room,
-      });
-    }
-
-    room.participants = room.participants.filter(
-      (participant) => participant.toString() !== userId
-    );
-
-    room.participantCount = room.participants.length;
-
-    await room.save();
+    await updatedRoom.save();
 
     return res.status(200).json({
       success: true,
       message: "Left room successfully",
-      data: room,
+      data: updatedRoom,
     });
   } catch (error) {
     console.error("Leave room error:", error);

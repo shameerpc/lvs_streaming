@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 import User from "../models/User.js";
 import { env } from "../config/env.js";
@@ -8,13 +9,6 @@ import { env } from "../config/env.js";
 export const register = async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, email and password are required",
-      });
-    }
 
     const existingUser = await User.findOne({ email });
 
@@ -45,6 +39,27 @@ export const register = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    if (
+      error instanceof mongoose.Error.ValidationError
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered",
+      });
+    }
+
     console.error("Register error:", error);
 
     return res.status(500).json({
@@ -85,6 +100,9 @@ export const login = async (req: Request, res: Response) => {
         message: "Invalid email or password",
       });
     }
+
+    user.online = true;
+    await user.save();
 
     const token = jwt.sign(
       {
