@@ -19,6 +19,8 @@ export const createRoom = async (
       });
     }
 
+    const roomName = name.trim();
+
     if (!req.userId) {
       return res.status(401).json({
         success: false,
@@ -26,8 +28,20 @@ export const createRoom = async (
       });
     }
 
+    const existingRoom = await Room.exists({
+      name: roomName,
+      status: "active",
+    });
+
+    if (existingRoom) {
+      return res.status(409).json({
+        success: false,
+        message: "Room name already in use",
+      });
+    }
+
     const room = await Room.create({
-      name: name.trim(),
+      name: roomName,
       host: req.userId,
       participants: [req.userId],
       participantCount: 1,

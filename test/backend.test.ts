@@ -275,6 +275,26 @@ describe("ROOMS", () => {
     ).toBe(true);
   });
 
+  it("rejects duplicate active room names", async () => {
+    const host = await registerUser(`room-dupe-${Date.now()}@test.com`);
+
+    const name = `Dupe Room ${Date.now()}`;
+
+    await request(server)
+      .post("/rooms")
+      .set(auth(host.token))
+      .send({ name })
+      .expect(201);
+
+    const res = await request(server)
+      .post("/rooms")
+      .set(auth(host.token))
+      .send({ name })
+      .expect(409);
+
+    expect(res.body.message).toBe("Room name already in use");
+  });
+
   it("rejects room creation without authentication", async () => {
     const res = await request(server)
       .post("/rooms")
@@ -435,6 +455,54 @@ describe("LIVEKIT", () => {
       .expect(404);
 
     expect(res.body.message).toBe("Room not found");
+  });
+
+  it("rejects LiveKit tokens for users who are not participants", async () => {
+    const host = await registerUser(`lk-nonmember-host-${Date.now()}@test.com`);
+    const outsider = await registerUser(
+      `lk-nonmember-out-${Date.now()}@test.com`
+    );
+
+    const roomName = `LiveKit Nonmember ${Date.now()}`;
+
+    const createRes = await request(server)
+      .post("/rooms")
+      .set(auth(host.token))
+      .send({ name: roomName })
+      .expect(201);
+
+    const roomId = createRes.body.data._id;
+
+    const outsiderRes = await request(server)
+      .post("/livekit/token")
+      .set(auth(outsider.token))
+      .send({ roomName })
+      .expect(403);
+
+    expect(outsiderRes.body.message).toBe(
+      "You are not a participant of this room"
+    );
+
+    const hostRes = await request(server)
+      .post("/livekit/token")
+      .set(auth(host.token))
+      .send({ roomName })
+      .expect(200);
+
+    expect(hostRes.body.data.role).toBe("host");
+
+    await request(server)
+      .post(`/rooms/${roomId}/join`)
+      .set(auth(outsider.token))
+      .expect(200);
+
+    const joinedRes = await request(server)
+      .post("/livekit/token")
+      .set(auth(outsider.token))
+      .send({ roomName })
+      .expect(200);
+
+    expect(joinedRes.body.data.role).toBe("participant");
   });
 
   it("returns a host token for the room owner and a participant token for others", async () => {

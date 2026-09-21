@@ -39,6 +39,18 @@ export async function generateLiveKitToken(
 
     const isHost = room.host.toString() === req.userId;
 
+    if (
+      !isHost &&
+      !room.participants.some(
+        (participant) => participant.toString() === req.userId
+      )
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not a participant of this room",
+      });
+    }
+
     const role = isHost ? "host" : "participant";
 
     const token = await createLiveKitToken(
