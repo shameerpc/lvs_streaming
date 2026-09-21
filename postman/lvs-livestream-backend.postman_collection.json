@@ -1,0 +1,189 @@
+{
+  "info": {
+    "name": "LVS Livestream Backend",
+    "_postman_id": "a1b2c3d4-0000-0000-0000-lvslivestream00",
+    "description": "REST API for the LVS livestream backend: auth, users, livestream rooms, and LiveKit access tokens.\n\nSetup:\n1. Start the backend (npm run dev or docker compose up --build).\n2. Set collection variable `base_url` to your server URL.\n3. Run `Register` once, then run `Login` (it saves the JWT into `token`).\n\nSocket.IO (presence/chat) is real-time and not testable in Postman — use the WebSocket client of your choice, or refer to the README.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection-schema.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "roomId", "value": "", "type": "string" },
+    { "key": "roomName", "value": "Demo Stream", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns user id', () => pm.expect(body.data.id).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice\",\n  \"email\": \"alice@example.com\",\n  \"password\": \"secret123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns a token', () => pm.expect(body.data.token).to.be.a('string'));",
+                  "pm.collectionVariables.set('token', body.data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"secret123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/users/me", "host": ["{{base_url}}"], "path": ["users", "me"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Rooms",
+      "item": [
+        {
+          "name": "Create Room",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('roomId', body.data._id);",
+                  "pm.collectionVariables.set('roomName', body.data.name);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{roomName}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/rooms", "host": ["{{base_url}}"], "path": ["rooms"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Active Rooms",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/rooms", "host": ["{{base_url}}"], "path": ["rooms"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Room By Id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/rooms/{{roomId}}", "host": ["{{base_url}}"], "path": ["rooms", "{{roomId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Join Room",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/rooms/{{roomId}}/join", "host": ["{{base_url}}"], "path": ["rooms", "{{roomId}}", "join"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Leave Room",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/rooms/{{roomId}}/leave", "host": ["{{base_url}}"], "path": ["rooms", "{{roomId}}", "leave"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "LiveKit",
+      "item": [
+        {
+          "name": "Get LiveKit Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomName\": \"{{roomName}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/livekit/token", "host": ["{{base_url}}"], "path": ["livekit", "token"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

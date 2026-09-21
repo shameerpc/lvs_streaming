@@ -5,7 +5,11 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm ci
+# The devDependency redis-memory-server ships a postinstall that requires
+# `make`, which node:22-alpine does not provide. Skip install scripts in the
+# builder: only tsc runs here, and none of its inputs need postinstall
+# artifacts. The runtime stage still installs production deps normally.
+RUN npm ci --ignore-scripts
 
 COPY tsconfig.json ./
 COPY src ./src
